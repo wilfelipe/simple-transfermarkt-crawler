@@ -39,16 +39,13 @@ class Player:
                         if len(row) >= 15:
                             jogosValores.append(row)
 
-                    header = ['competition', 'matchday', 'date', 'venue', 'team', 'opponent', 'result', 'position', 'goals', 'assists', 'yellow', 'secondYellow', 'red', 'minutesPlayed']
+                    header = ['competition', 'matchday', 'date', 'homeTeam', 'awayTeam', 'result', 'position', 'goals', 'assists', 'ownGoals', 'yellow', 'secondYellow', 'red', 'substiturionsOn', 'substiturionsOff', 'minutesPlayed']
 
                     if jogosValores != []:
                         df = pd.DataFrame(jogosValores) 
-                        if len(df.columns) == 16:
-                            df = df.drop([5, 7], axis = 1)  
-                        else:
-                            df = df.drop([6], axis = 1)  #Removendo colunas descessárias
-
+                        df = df.drop([4, 6], axis = 1)  #Removendo colunas descessárias
                         df.columns = header
+
 
                         #Removing games that the player did not play. If columns minutesPlayed is null, means player dont play that match.
                         df = df[pd.notnull(df['minutesPlayed'])]
@@ -60,26 +57,27 @@ class Player:
                         df['assists'].replace('None', 0, inplace=True)
                         df['goals'] = pd.to_numeric(df['goals'])
                         df['assists'] = pd.to_numeric(df['assists'])
-                        
+
                         df.replace('None', np.nan, inplace=True)
 
                         #Sorting values by date columns
                         df.sort_values(by=['date'], inplace=True)
 
                         #getting name of the teams from a img tag
-                        teams = []
-                        oponnent = []
+                        homeTeam = []
+                        awayTeam = []
                         for index, row in df.iterrows():
-                            img = BeautifulSoup(row['team']).find('img')
-                            teams.append(img['alt'])
-                            img = BeautifulSoup(row['opponent']).find('img')
-                            oponnent.append(img['alt'])
-                        df['team'] = teams
-                        df['opponent'] = oponnent
-                        
+                            img = BeautifulSoup(row['homeTeam']).find('img')
+                            homeTeam.append(img['alt'])
+                            img = BeautifulSoup(row['awayTeam']).find('img')
+                            awayTeam.append(img['alt'])
+                        df['homeTeam'] = homeTeam
+                        df['awayTeam'] = awayTeam
+
                         df['minutesPlayed'] = pd.to_numeric(df['minutesPlayed'].str[:-1])
 
                         li.append(df)
+
 
             return pd.concat(li, axis=0, ignore_index=True)
     
@@ -90,16 +88,19 @@ class Player:
         stats.sort_values('appearances', ascending=False)
         return stats
     
-    def matches(self, competition='', opponent=''):
-        return self.df.loc[(self.df['competition'].str.contains('^'+competition, na=False)) & (self.df['opponent'].str.contains('^'+opponent, na=False))]
+    def matches(self, competition='', opponent='', date=''):
+        return self.df.loc[(self.df['competition'].str.contains('^'+competition, na=False)) & 
+                            ((self.df['homeTeam'].str.contains('^'+opponent, na=False)) | 
+                            (self.df['awayTeam'].str.contains('^'+opponent, na=False))) & 
+                            (self.df['date'].astype(str).str.contains('^'+str(date), na=False))]
                 
     
     def __init__(self, playerId):
         dados = []
-        url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/0?saison=&verein=&liga=1&wettbewerb=&pos=&trainer_id='
+        url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/1?saison=&verein=&liga=1&wettbewerb=&pos=&trainer_id='
         dados.append(self.getData(url))
         for i in range(8, 14):
-            url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/0?saison=&verein=&liga=' + str(i) + '&wettbewerb=&pos=&trainer_id='
+            url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/1?saison=&verein=&liga=' + str(i) + '&wettbewerb=&pos=&trainer_id='
             dados.append(self.getData(url))
         
         self.df = pd.concat(dados, axis=0, ignore_index=True)
