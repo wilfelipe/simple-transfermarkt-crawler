@@ -30,6 +30,7 @@ class Player:
                     jogosValores = []
                     for jogo in table.find('tbody').find_all('tr'):
                         row = [league]
+                        
                         for coluna in jogo.find_all('td'):
                             if ''.join(coluna.text.split()) != '':
                                 row.append(coluna.text.strip())
@@ -39,43 +40,48 @@ class Player:
                         if len(row) >= 15:
                             jogosValores.append(row)
 
-                    header = ['competition', 'matchday', 'date', 'homeTeam', 'awayTeam', 'result', 'position', 'goals', 'assists', 'ownGoals', 'yellow', 'secondYellow', 'red', 'substiturionsOn', 'substiturionsOff', 'minutesPlayed']
+                    header = ['competition', 'matchday', 'date', 'venue', 'team', 'opponent', 'result', 'position', 'goals', 'assists', 'yellow', 'secondYellow', 'red', 'minutesPlayed']
 
                     if jogosValores != []:
                         df = pd.DataFrame(jogosValores) 
-                        df = df.drop([4, 6], axis = 1)  #Removendo colunas descessárias
+                        if len(df.columns) == 16:
+                            df = df.drop([5, 7], axis = 1)  
+                        else:
+                            df = df.drop([6], axis = 1)  #Removendo colunas descessárias
                         df.columns = header
 
 
                         #Removing games that the player did not play. If columns minutesPlayed is null, means player dont play that match.
                         df = df[pd.notnull(df['minutesPlayed'])]
-
+                        
+                        
                         df['date'] = pd.to_datetime(df['date'])
-
+                        
                         #replacing none values with 0 and converting all values from string to number
                         df['goals'].replace('None', 0, inplace=True)
                         df['assists'].replace('None', 0, inplace=True)
                         df['goals'] = pd.to_numeric(df['goals'])
                         df['assists'] = pd.to_numeric(df['assists'])
-
+                        
+                        
                         df.replace('None', np.nan, inplace=True)
 
                         #Sorting values by date columns
                         df.sort_values(by=['date'], inplace=True)
-
+                        
                         #getting name of the teams from a img tag
-                        homeTeam = []
-                        awayTeam = []
+                        teams = []
+                        oponnent = []
                         for index, row in df.iterrows():
-                            img = BeautifulSoup(row['homeTeam']).find('img')
-                            homeTeam.append(img['alt'])
-                            img = BeautifulSoup(row['awayTeam']).find('img')
-                            awayTeam.append(img['alt'])
-                        df['homeTeam'] = homeTeam
-                        df['awayTeam'] = awayTeam
+                            img = BeautifulSoup(row['team']).find('img')
+                            teams.append(img['alt'])
+                            img = BeautifulSoup(row['opponent']).find('img')
+                            oponnent.append(img['alt'])
+                        df['team'] = teams
+                        df['opponent'] = oponnent
 
                         df['minutesPlayed'] = pd.to_numeric(df['minutesPlayed'].str[:-1])
-
+                        
                         li.append(df)
 
 
@@ -90,20 +96,19 @@ class Player:
     
     def matches(self, competition='', opponent='', date=''):
         return self.df.loc[(self.df['competition'].str.contains('^'+competition, na=False)) & 
-                            ((self.df['homeTeam'].str.contains('^'+opponent, na=False)) | 
-                            (self.df['awayTeam'].str.contains('^'+opponent, na=False))) & 
+                            (self.df['opponent'].str.contains('^'+opponent, na=False)) & 
                             (self.df['date'].astype(str).str.contains('^'+str(date), na=False))]
                 
     
     def __init__(self, playerId):
         dados = []
-        url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/1?saison=&verein=&liga=1&wettbewerb=&pos=&trainer_id='
+        url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/0?saison=&verein=&liga=1&wettbewerb=&pos=&trainer_id='
         dados.append(self.getData(url))
         for i in range(8, 14):
-            url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/1?saison=&verein=&liga=' + str(i) + '&wettbewerb=&pos=&trainer_id='
+            url = 'https://www.transfermarkt.com/-/leistungsdatendetails/spieler/' + str(playerId) + '/plus/0?saison=&verein=&liga=' + str(i) + '&wettbewerb=&pos=&trainer_id='
             dados.append(self.getData(url))
         
         self.df = pd.concat(dados, axis=0, ignore_index=True)
 
         #Sorting values by date columns
-        self.df.sort_values(by=['date'], inplace=True)
+        #self.df.sort_values(by=['date'], inplace=True)
